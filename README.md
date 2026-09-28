@@ -189,7 +189,8 @@ Two modes, ready-made for each OS in `macOS/`, `linux/` and `win11/`:
   30 minutes. The better fit for a machine that sleeps.
 - **daemon** -- `run` always on: the models stay loaded (~16 GB with the
   default Qwen captioner) and new photos are picked up within
-  `--interval` seconds (default 120). A server that is down or deploying
+  `--interval` seconds (default 120; the macOS installer sets 20, or
+  `macOS/install.sh daemon 30` for another number). A server that is down or deploying
   is retried every 30s in-process.
 
 Each folder's install script fills in where the repo is, replaces
@@ -201,7 +202,7 @@ models (a few GB) -- do that one from a terminal with
 ### macOS -- launchd agent
 
 ```sh
-macOS/install.sh interval        # or: daemon
+macOS/install.sh interval        # or: daemon [SECONDS] (idle check, default 20)
 tail -f ~/Library/Logs/a2-photo-indexer.log
 launchctl kickstart -k gui/$(id -u)/com.a2cons.photo-indexer   # run / restart it now
 macOS/install.sh remove
@@ -344,3 +345,11 @@ views_url, …}]}`, `GET /api/ai/plans/<id>/views/` → `{full, corner}` (base64
 JPEG), `POST /api/ai/plans/<id>/detection/` `{sheet_number, sheet_title,
 model}`, `GET /api/ai/plans/stats/` — see the app repo,
 `backend/estimating/photo_ai_views.py`.
+
+
+### Log timestamps
+
+When the output goes to a log file (launchd on macOS, Task Scheduler on
+Windows), every line starts with the local date and time. A terminal and
+the systemd journal (which stamps lines itself) get none. Override with
+`--timestamps on|off`.

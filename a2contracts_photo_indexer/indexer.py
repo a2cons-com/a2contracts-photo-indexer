@@ -435,6 +435,39 @@ def run(args) -> None:
                     time.sleep(5)
 
 
+class _Timestamped:
+    """Puts the local date and time in front of every line written through
+    it: launchd (macOS) and Task Scheduler (Windows) write the output to a
+    plain file with no times. systemd's journal stamps lines itself."""
+
+    def __init__(self, stream):
+        self._stream = stream
+        self._at_line_start = True
+
+    def write(self, text):
+        out = []
+        for piece in text.splitlines(keepends=True):
+            if self._at_line_start:
+                out.append(time.strftime('%Y-%m-%d %H:%M:%S '))
+            out.append(piece)
+            self._at_line_start = piece.endswith('\n')
+        self._stream.write(''.join(out))
+        return len(text)
+
+    def flush(self):
+        self._stream.flush()
+
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
+
+
+def _use_timestamps(choice: str) -> bool:
+    if choice in ('on', 'off'):
+        return choice == 'on'
+    # auto: a log file, not a terminal and not the systemd journal.
+    return not sys.stdout.isatty() and 'JOURNAL_STREAM' not in os.environ
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description='A2 Contracts photo indexer')
     parser.add_argument('command', choices=['login', 'run', 'status', 'transcode'])
@@ -448,6 +481,8 @@ def main() -> None:
     parser.add_argument('--quantize', default='auto', help='auto | none | 4bit | 8bit -- weights precision for the captioner (CUDA only; auto = 4bit on a card under 20 GB)')
     parser.add_argument('--batch', type=int, default=16, help='photos fetched per round')
     parser.add_argument('--interval', type=int, default=120, help='seconds to wait when nothing is pending')
+    parser.add_argument('--timestamps', choices=['auto', 'on', 'off'], default='auto',
+                        help='date and time in front of each output line (auto: on when writing to a log file, off in a terminal or the systemd journal)')
     parser.add_argument('--once', action='store_true', help='one pass, then exit')
     parser.add_argument('--no-plans', action='store_true', help='skip the plan-sheet title-block queue')
     parser.add_argument('--no-reports', action='store_true', help='skip writing daily-report notes')
@@ -460,6 +495,9 @@ def main() -> None:
     # Under launchd/systemd/Task Scheduler stdout is a file or pipe, which
     # Python block-buffers: progress lines would lag minutes behind stderr.
     sys.stdout.reconfigure(line_buffering=True)
+    if _use_timestamps(args.timestamps):
+        sys.stdout = _Timestamped(sys.stdout)
+        sys.stderr = _Timestamped(sys.stderr)
     if args.command == 'login':
         Api(args.api).login()
     elif args.command == 'status':

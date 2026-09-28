@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- REPO and HOME are filled in by macOS/install.sh -->
+<!-- REPO, HOME and INTERVAL are filled in by macOS/install.sh -->
 <plist version="1.0">
 <dict>
   <key>Label</key><string>com.a2cons.photo-indexer</string>
@@ -8,6 +8,8 @@
   <array>
     <string>REPO/.venv/bin/a2-photo-indexer</string>
     <string>run</string>
+    <string>--interval</string>
+    <string>INTERVAL</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict>
