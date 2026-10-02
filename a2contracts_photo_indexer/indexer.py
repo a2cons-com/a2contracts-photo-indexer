@@ -131,6 +131,14 @@ class Api:
         # The rows come back leased to this worker (`worker` names it in
         # the app's queue): a second machine polling gets other rows.
         r = self.request('GET', f'/api/ai/photos/pending/?model={requests.utils.quote(model)}&limit={limit}&worker={requests.utils.quote(WORKER)}')
+        if r.status_code == 409:
+            # The server accepts ONE fingerprint model (PHOTO_EMBEDDING_MODEL,
+            # 2026-10-01) and it isn't ours: no photo work for this machine.
+            # Notes, plans and videos still run. Said once, not every poll.
+            if not getattr(self, '_told_embedder', False):
+                print(f"photos skipped: {r.json().get('detail', 'wrong fingerprint model')}", file=sys.stderr)
+                self._told_embedder = True
+            return []
         r.raise_for_status()
         return r.json()
 
@@ -523,7 +531,7 @@ def main() -> None:
     parser.add_argument('command', choices=['login', 'run', 'status', 'transcode'])
     parser.add_argument('--api', default=os.environ.get('A2_API', 'https://contracts.a2cons.com'))
     parser.add_argument('--captioner', choices=['qwen', 'florence', 'none'], default='qwen')
-    parser.add_argument('--qwen-model', default='Qwen/Qwen3-VL-8B-Instruct')
+    parser.add_argument('--qwen-model', default=os.environ.get('A2_QWEN_MODEL') or 'Qwen/Qwen3-VL-8B-Instruct', help='the caption / note / title-block model (also A2_QWEN_MODEL); e.g. Qwen/Qwen3-VL-30B-A3B-Instruct')
     parser.add_argument('--florence-model', default='microsoft/Florence-2-large')
     parser.add_argument('--embedder', choices=['siglip', 'none'], default='siglip')
     parser.add_argument('--siglip-model', default='ViT-SO400M-14-SigLIP-384')

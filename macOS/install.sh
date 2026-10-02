@@ -3,6 +3,8 @@
 #   interval: `run --once` every 30 minutes while the Mac is awake
 #   daemon:   `run` always on, models stay loaded (~16 GB); checks for new
 #             work every SECONDS when idle (default 20)
+#   A2_QWEN_MODEL=... in front picks the caption/note model, e.g.
+#   A2_QWEN_MODEL=Qwen/Qwen3-VL-30B-A3B-Instruct macOS/install.sh daemon
 # macOS/install.sh remove -- stops and removes it.
 set -e
 MODE=${1:?usage: $0 interval|daemon [SECONDS]|remove}
@@ -21,8 +23,9 @@ if [ "$MODE" = remove ]; then
 fi
 [ -f "$REPO/macOS/$LABEL.$MODE.plist" ] || { echo "unknown mode: $MODE" >&2; exit 1; }
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
-sed -e "s|REPO/|$REPO/|" -e "s|HOME/|$HOME/|g" -e "s|<string>INTERVAL</string>|<string>$INTERVAL</string>|" "$REPO/macOS/$LABEL.$MODE.plist" > "$DEST"
+QWEN=${A2_QWEN_MODEL:-Qwen/Qwen3-VL-8B-Instruct}
+sed -e "s|REPO/|$REPO/|" -e "s|HOME/|$HOME/|g" -e "s|<string>INTERVAL</string>|<string>$INTERVAL</string>|" -e "s|<string>QWEN_MODEL</string>|<string>$QWEN</string>|" "$REPO/macOS/$LABEL.$MODE.plist" > "$DEST"
 plutil -lint "$DEST" >/dev/null
 launchctl bootstrap "$DOMAIN" "$DEST"
 if [ "$MODE" = daemon ]; then WHAT="daemon, idle check every ${INTERVAL}s"; else WHAT=$MODE; fi
-echo "installed $LABEL ($WHAT); log: tail -f ~/Library/Logs/a2-photo-indexer.log"
+echo "installed $LABEL ($WHAT, $QWEN); log: tail -f ~/Library/Logs/a2-photo-indexer.log"

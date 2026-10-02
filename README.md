@@ -30,6 +30,16 @@ separately (2026-10-01):
   fingerprint is the cheap part) and the caption and tags stay. It has to:
   two models' fingerprints can't be compared, so "similar photos" only
   compares fingerprints from the same model meanwhile.
+- **The server decides the fingerprint model** (`PHOTO_EMBEDDING_MODEL` in
+  the server's `.env`, default `ViT-SO400M-14-SigLIP-384`). An indexer
+  running a different `--siglip-model` gets no photo work ("photos skipped:
+  …" once in the log) and its fingerprints are refused; its notes, plan
+  readings and videos still run. Switching on the server is the deliberate
+  re-fingerprint of every photo.
+- **Trying another caption/note model** on the Mac: reinstall the daemon
+  with it -- `A2_QWEN_MODEL=Qwen/Qwen3-VL-30B-A3B-Instruct macOS/install.sh
+  daemon` (back: run `macOS/install.sh daemon` without it). Compare speeds
+  on the app's Site admin -> Local AI page.
 
 ## Set up (once per machine)
 
