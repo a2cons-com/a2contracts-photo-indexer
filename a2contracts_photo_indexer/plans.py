@@ -76,6 +76,8 @@ def process_plans(api, captioner, limit: int) -> int:
             if r.status_code != 200:
                 raise RuntimeError(f'rejected ({r.status_code}): {r.text[:300]}')
             result = r.json()
+            if number or title:
+                api.record_run('plan_ocr', row['id'], captioner.name, getattr(captioner, 'last_stats', None), 2, time.time() - started)
             print(f"sheet #{row['id']} {row['project_name'][:24]:24s} p{row['page']:<3} {time.time() - started:5.1f}s  {number or '(nothing)'} {title[:50]}" + (f"  -> {result['sheet_number']} {result['title']}" if result.get('changed') else ''))
         except Exception as exc:  # noqa: BLE001
             print(f"sheet #{row['id']} could not post the reading: {exc}", file=sys.stderr)

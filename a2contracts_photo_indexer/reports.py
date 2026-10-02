@@ -74,6 +74,7 @@ def process_reports(api, captioner) -> int:
             r = api.request('POST', f"/api/ai/reports/{row['id']}/suggestion/", json={'basis': row['basis'], 'text': text, 'model': captioner.name})
             if r.status_code != 200:
                 raise RuntimeError(f'rejected ({r.status_code}): {r.text[:300]}')
+            api.record_run('note', row['id'], captioner.name, getattr(captioner, 'last_stats', None), len(images), time.time() - started)
             print(f"report #{row['id']} {row['project_name'][:24]:24s} {time.time() - started:5.1f}s  {text[:80]}")
         except Exception as exc:  # noqa: BLE001
             print(f"report #{row['id']} could not post the note: {exc}", file=sys.stderr)

@@ -131,6 +131,17 @@ back to `/api/ai/reports/<id>/suggestion/`. The app fills the draft's note
 with it unless a person already wrote one (then it's offered as a
 suggestion). Needs `--captioner qwen`; `--no-reports` skips it.
 
+## How fast it is (Site admin -> Local AI)
+
+Every Qwen call -- a photo caption, a report note, a plan title block --
+is timed: tokens read (prompt, report text, photos) and written, the
+reading time until the first written token, and the writing time after
+it. The agent posts those numbers to the app (`POST /api/ai/runs/`), and
+the site admin's **Local AI** page shows them per run and per model over
+the last 7 days, in tokens per second. Best effort: an older server or a
+failed post never stops a job. Florence and the video encoder aren't
+timed (no prompt / no tokens).
+
 ## Videos
 
 The same worker also encodes videos (the server only probes a clip and

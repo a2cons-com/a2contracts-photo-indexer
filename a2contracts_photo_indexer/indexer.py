@@ -154,6 +154,22 @@ class Api:
         except Exception as exc:  # noqa: BLE001 -- the lease expires on its own anyway
             print(f'could not release {len(ids)} rows: {exc}', file=sys.stderr)
 
+    def record_run(self, job: str, ref_id, model: str, stats: dict | None, images: int, seconds: float) -> None:
+        """Tells the app how long a model call took and how many tokens it
+        read and wrote (Site admin -> Local AI, 2026-10-01). Best effort: a
+        server without /api/ai/runs/ or a hiccup never stops the job."""
+        if not stats:
+            return
+        try:
+            self.request('POST', '/api/ai/runs/', json={
+                'job': job, 'ref_id': ref_id, 'model': model, 'worker': WORKER, 'images': images,
+                'input_tokens': stats.get('input_tokens', 0), 'output_tokens': stats.get('output_tokens', 0),
+                'prefill_ms': round(stats.get('prefill_s', 0) * 1000), 'generate_ms': round(stats.get('generate_s', 0) * 1000),
+                'total_ms': round(seconds * 1000),
+            }, timeout=10)
+        except Exception:  # noqa: BLE001 -- statistics only
+            pass
+
     def post_index(self, photo_id: int, payload: dict) -> None:
         r = self.request('POST', f'/api/ai/photos/{photo_id}/index/', json=payload)
         if r.status_code != 200:
@@ -252,6 +268,24 @@ def pick_quantization(requested: str, device: str) -> str:
     return '4bit' if total_gb < 20 else 'none'
 
 
+class _FirstTokenTimer:
+    """A transformers streamer that only notes WHEN the first new token
+    came out: generate() hands it the prompt first, then each new token.
+    Splits a call into reading (prefill) and writing (generation)."""
+
+    def __init__(self):
+        self.calls = 0
+        self.first_at: float | None = None
+
+    def put(self, value):
+        self.calls += 1
+        if self.calls == 2 and self.first_at is None:
+            self.first_at = time.perf_counter()
+
+    def end(self):
+        pass
+
+
 class QwenCaptioner:
     """Caption + tags from a Qwen VL model (2.5-VL or 3-VL) via transformers."""
 
@@ -291,9 +325,19 @@ class QwenCaptioner:
         content = [{'type': 'image', 'image': image} for image in (images if isinstance(images, (list, tuple)) else [images])]
         messages = [{'role': 'user', 'content': [*content, {'type': 'text', 'text': prompt}]}]
         inputs = self.processor.apply_chat_template(messages, add_generation_prompt=True, tokenize=True, return_dict=True, return_tensors='pt').to(self.model.device)
+        timer = _FirstTokenTimer()
+        started = time.perf_counter()
         with self.torch.no_grad():
-            out = self.model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
-        return self.processor.batch_decode(out[:, inputs['input_ids'].shape[1]:], skip_special_tokens=True)[0]
+            out = self.model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False, streamer=timer)
+        ended = time.perf_counter()
+        n_in = int(inputs['input_ids'].shape[1])
+        first = timer.first_at or ended
+        # The numbers the app's Local AI page shows (Api.record_run).
+        self.last_stats = {
+            'input_tokens': n_in, 'output_tokens': int(out.shape[1]) - n_in,
+            'prefill_s': first - started, 'generate_s': ended - first,
+        }
+        return self.processor.batch_decode(out[:, n_in:], skip_special_tokens=True)[0]
 
     def __call__(self, image) -> tuple[str, list[str]]:
         return _parse_vlm(self.ask(image, PROMPT))
@@ -417,6 +461,7 @@ def run(args) -> None:
                     payload['dim'] = len(vector)
                     payload['tags'] = list(dict.fromkeys([*tags, *vocab_tags]))
                 api.post_index(row['id'], payload)
+                api.record_run('photo', row['id'], model_name, getattr(captioner, 'last_stats', None), 1, time.time() - started)
                 print(f"#{row['id']} {row['project_name'][:30]:30s} {time.time() - started:5.1f}s  {caption[:70]}")
             except requests.RequestException as exc:
                 # The server, not the photo: hand the rest back and wait
