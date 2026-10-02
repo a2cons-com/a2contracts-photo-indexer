@@ -200,10 +200,12 @@ a2-photo-indexer run --once && a2-photo-indexer transcode --once
 
 Run `run` (and/or `transcode`) on the Mac and the GPU box at the same
 time: the app leases each row it hands out to the worker that asked
-(named by `A2_WORKER` in the environment, else the hostname) for 30
-minutes (3 hours for a video), so the other machine gets the next rows
-instead of the same ones. A worker that dies mid-batch just lets its
-leases expire and those photos are handed out again; `status` shows
+(named by `A2_WORKER` in the environment, else the hostname) for as
+long as the batch should take -- 30 s a photo plus a minute, so 9 minutes
+for the default 16, at most 30 (3 hours for a video) -- so the other
+machine gets the next rows instead of the same ones. A worker that dies
+mid-batch lets its leases expire and those photos are handed out again,
+and when it starts again it takes back whatever its own name still holds; `status` shows
 `in_progress` = rows currently with a worker. Nothing to configure --
 start both. Ctrl-C is clean: the photo being captioned finishes and is
 posted, the rest of the batch is handed back to the queue at once
