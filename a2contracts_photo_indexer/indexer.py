@@ -162,6 +162,19 @@ class Api:
         except Exception as exc:  # noqa: BLE001 -- the lease expires on its own anyway
             print(f'could not release {len(ids)} rows: {exc}', file=sys.stderr)
 
+    def release_mine(self, purpose: str) -> None:
+        """Hands back every row still leased to this worker's name -- a
+        previous run that crashed or was killed never released its batch,
+        and those rows would otherwise sit as "with other workers" until
+        their lease ran out (30 min for photos)."""
+        try:
+            r = self.request('POST', '/api/ai/claims/release/', json={'purpose': purpose, 'worker': WORKER}, timeout=30)
+            released = r.json().get('released') if r.ok else 0
+            if released:
+                print(f'took back {released} {purpose} rows a previous run of {WORKER} left leased')
+        except Exception as exc:  # noqa: BLE001 -- the lease expires on its own anyway
+            print(f'could not release leftover {purpose} rows: {exc}', file=sys.stderr)
+
     def record_run(self, job: str, ref_id, model: str, stats: dict | None, images: int, seconds: float) -> None:
         """Tells the app how long a model call took and how many tokens it
         read and wrote (Site admin -> Local AI, 2026-10-01). Best effort: a
@@ -417,6 +430,11 @@ def run(args) -> None:
     encoder = None if args.no_videos else check_ffmpeg(args)
     if encoder:
         print(f'video encoder: {encoder}')
+    # Leftovers from a run of this machine that crashed (2026-10-02: 11
+    # photos sat "with other workers" after one) -- this worker's own name only.
+    api.release_mine('index')
+    if encoder:
+        api.release_mine('transcode')
 
     while not stop['now']:
         # The server deploys, restarts, drops a connection: none of that
