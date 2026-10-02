@@ -230,8 +230,13 @@ models (a few GB) -- do that one from a terminal with
 
 ### macOS -- launchd agent
 
+Pick ONE mode -- installing one replaces the other:
+
 ```sh
-macOS/install.sh interval        # or: daemon [SECONDS] (idle check, default 20)
+macOS/install.sh interval        # a pass every 30 min, then exits (no SECONDS: the 30 min is fixed)
+macOS/install.sh daemon          # always on, checks for new photos every 20 s when idle
+macOS/install.sh daemon 60       # always on, checks every 60 s
+grep -q -- --once ~/Library/LaunchAgents/com.a2cons.photo-indexer.plist && echo interval || echo daemon   # which one is installed
 tail -f ~/Library/Logs/a2-photo-indexer.log
 launchctl kickstart -k gui/$(id -u)/com.a2cons.photo-indexer   # run / restart it now
 macOS/install.sh remove
