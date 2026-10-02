@@ -19,9 +19,17 @@ with a GPU (the 5060 Ti box: CUDA) or Apple silicon (the M3: MPS).
 | Embedding + vocabulary tags | `ViT-SO400M-14-SigLIP-384` (open_clip, `webli` weights) | 1152-dim vector for "similar photos", plus zero-shot tags from the construction vocabulary in `indexer.py` (`VOCABULARY`) — consistent tags across photos, unlike free text. `--embedder none` skips it. |
 
 The index's **model name** is `<captioner>+<embedder>` (e.g.
-`Qwen3-VL-8B-Instruct+ViT-SO400M-14-SigLIP-384`). Change a model and every
-photo is pending again for the new name; the server keeps the old rows
-until they are replaced, so search keeps working through a re-index.
+`Qwen3-VL-8B-Instruct+ViT-SO400M-14-SigLIP-384`). The two halves count
+separately (2026-10-01):
+
+- **A new caption model** (`--qwen-model`, `--captioner`) redoes nothing:
+  photos keep the caption they have -- text search doesn't care which model
+  wrote it -- and only new photos get the new model's captions.
+- **A new embedding model** (`--siglip-model`) makes every photo pending
+  for a new fingerprint only: the worker skips Qwen for those (fast -- the
+  fingerprint is the cheap part) and the caption and tags stay. It has to:
+  two models' fingerprints can't be compared, so "similar photos" only
+  compares fingerprints from the same model meanwhile.
 
 ## Set up (once per machine)
 

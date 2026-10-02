@@ -451,8 +451,12 @@ def run(args) -> None:
             started = time.time()
             try:
                 image = load_image(api.image(row['url']))
-                caption, tags = captioner(image) if captioner else ('', [])
-                payload = {'model': model_name, 'caption': caption, 'tags': tags}
+                # 'embedding': it already has a caption (maybe from another
+                # model) -- keep it, only make the new fingerprint. A new
+                # caption model never redoes old captions (2026-10-01).
+                refresh = row.get('needs') == 'embedding'
+                caption, tags = captioner(image) if captioner and not refresh else ('', [])
+                payload = {'model': model_name, 'caption': caption, 'tags': tags, 'embedding_only': refresh}
                 if embedder:
                     vector, vocab_tags = embedder(image)
                     import numpy as np
@@ -461,8 +465,9 @@ def run(args) -> None:
                     payload['dim'] = len(vector)
                     payload['tags'] = list(dict.fromkeys([*tags, *vocab_tags]))
                 api.post_index(row['id'], payload)
-                api.record_run('photo', row['id'], model_name, getattr(captioner, 'last_stats', None), 1, time.time() - started)
-                print(f"#{row['id']} {row['project_name'][:30]:30s} {time.time() - started:5.1f}s  {caption[:70]}")
+                if not refresh:
+                    api.record_run('photo', row['id'], model_name, getattr(captioner, 'last_stats', None), 1, time.time() - started)
+                print(f"#{row['id']} {row['project_name'][:30]:30s} {time.time() - started:5.1f}s  {'(new fingerprint, caption kept)' if refresh else caption[:70]}")
             except requests.RequestException as exc:
                 # The server, not the photo: hand the rest back and wait
                 # for it (never record "indexing failed" for a deploy).
