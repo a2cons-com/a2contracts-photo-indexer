@@ -367,7 +367,10 @@ AVPlayer.
 - Lightbox → "Similar": the closest photos in the project by embedding.
 - Album grantees never see AI fields; their search covers their albums.
 
-API (company admin, bearer token): `GET /api/ai/photos/pending/?model=&limit=`,
+API (company admin, bearer token): `GET /api/ai/photos/pending/?model=&limit=`
+(each row to caption carries `prompt`: the caption prompt plus the photo's
+context -- project, schedule tasks around its day, albums, the person's
+caption; Qwen uses it, Florence can't),
 `POST /api/ai/photos/<id>/index/`, `GET /api/ai/photos/stats/?model=`; plans:
 `GET /api/ai/plans/pending/?limit=&worker=` → `{prompt, sheets: [{id, page,
 views_url, …}]}`, `GET /api/ai/plans/<id>/views/` → `{full, corner}` (base64

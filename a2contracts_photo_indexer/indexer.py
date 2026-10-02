@@ -347,8 +347,11 @@ class QwenCaptioner:
         }
         return self.processor.batch_decode(out[:, n_in:], skip_special_tokens=True)[0]
 
-    def __call__(self, image) -> tuple[str, list[str]]:
-        return _parse_vlm(self.ask(image, PROMPT))
+    def __call__(self, image, prompt: str | None = None) -> tuple[str, list[str]]:
+        # The server's prompt when it sends one: PROMPT plus the photo's own
+        # context (project, schedule around its day, albums, the person's
+        # caption); this PROMPT is only the fallback for an older server.
+        return _parse_vlm(self.ask(image, prompt or PROMPT))
 
 
 class FlorenceCaptioner:
@@ -364,7 +367,8 @@ class FlorenceCaptioner:
         self.device, self.dtype, self.torch = device, dtype, torch
         self.name = model_name.split('/')[-1]
 
-    def __call__(self, image) -> tuple[str, list[str]]:
+    def __call__(self, image, prompt: str | None = None) -> tuple[str, list[str]]:
+        # Florence-2 takes no free prompt; the server's context is ignored.
         task = '<MORE_DETAILED_CAPTION>'
         inputs = self.processor(text=task, images=image, return_tensors='pt').to(self.device, self.dtype)
         with self.torch.no_grad():
@@ -463,7 +467,7 @@ def run(args) -> None:
                 # model) -- keep it, only make the new fingerprint. A new
                 # caption model never redoes old captions (2026-10-01).
                 refresh = row.get('needs') == 'embedding'
-                caption, tags = captioner(image) if captioner and not refresh else ('', [])
+                caption, tags = captioner(image, row.get('prompt')) if captioner and not refresh else ('', [])
                 payload = {'model': model_name, 'caption': caption, 'tags': tags, 'embedding_only': refresh}
                 if embedder:
                     vector, vocab_tags = embedder(image)
